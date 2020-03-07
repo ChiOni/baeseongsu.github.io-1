@@ -44,8 +44,15 @@
 
   /* Sidebar */
 
+    /* Sidebar(기존값)
   --sidebar-bg: radial-gradient(
     circle, rgba(42, 30, 107, 1) 0%, rgba(35, 37, 46, 1) 100%);
+    */
+
+    /* Sidebar(변경값) */
+  --sidebar-bg: radial-gradient(
+    circle, rgba(42, 64, 142, 1) 0%, rgba(42, 64, 142, 1) 100%);
+    /* */
 
   --nav-cursor-color: #fcfcfc;
 
