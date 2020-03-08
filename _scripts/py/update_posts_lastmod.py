@@ -83,6 +83,7 @@ def update_lastmod(path, verbose, date):
             lastmod = dt.strftime('%F %T') + time.strftime(' %z')
 
         frontmatter, line_num = get_yaml(post)
+        print(frontmatter)
         meta = yaml.load(frontmatter)
 
         if 'seo' in meta:
