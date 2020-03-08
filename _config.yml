@@ -46,10 +46,10 @@ google_site_verification: google_meta_tag_verification # change to your verifica
 #--------------------------
 
 # if your site type is Project Pages site, change below value to '/projectname'
-baseurl: '/baeseongsu.github.io'
+baseurl: ''
 
 # Change to your timezone › http://www.timezoneconverter.com/cgi-bin/findzone/findzone
-timezone: Asia/Shanghai
+timezone: Asia/Seoul
 
 google_analytics:
   # Fill with your Google Analytics ID
@@ -201,5 +201,11 @@ sitemap_exclude:  # Sitemap will exclude the following items.
     - redirects.json
 
 
+# 추가한 내용 
 plugins: # add some pluginss
   - jemoji
+
+
+lsi: false
+excerpt_separator: "\n\n"
+incremental: false
