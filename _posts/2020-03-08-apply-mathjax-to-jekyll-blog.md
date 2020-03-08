@@ -1,9 +1,11 @@
 ---
-title: "Jekyll Github 블로그에 MathJax 적용하기"
+title: Jekyll Github 블로그에 MathJax 적용하기
 date: 2020-03-09 00:16:00
 categories: [Blogging, Setting]
 tags: [Jekyll, MathJax]
 use_math: true
+seo:
+  date_modified: 2020-03-09 03:13:23 +0900
 ---
 
 
