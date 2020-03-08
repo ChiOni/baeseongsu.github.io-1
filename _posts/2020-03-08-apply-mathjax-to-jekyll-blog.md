@@ -5,7 +5,7 @@ categories: [Blogging, Setting]
 tags: [Jekyll, MathJax]
 use_math: true
 seo:
-  date_modified: 2020-03-09 03:24:36 +0900
+  date_modified: 2020-03-09 03:25:56 +0900
 ---
 
 
