@@ -1,10 +1,10 @@
 ---
-title: 2020년 3월 블로그를 시작합니다.
+title: "2020년 3월 블로그를 시작합니다."
 date: 2020-03-07 11:33:00
 categories: [Personal, Diary]
 tags: [Diary]
 seo:
-  date_modified: 2020-03-09 02:42:26 +0900
+  date_modified: 2020-03-09 03:16:48 +0900
 ---
 
 안녕하세요 :smile: 기존에 사용하던 블로그를 정리하고, 새롭게 시작합니다!
