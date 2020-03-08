@@ -36,7 +36,7 @@ use_math : true
     - 즉, 총 자료 구조의 크기는 $O(\lvert{E}\rvert)$
     - 특정 edge 확인할 때는 더 이상 constant time이 아님
     - 하지만, iteratate하기 쉬움
-
+    <!--  -->
 - 인접 행렬, 인접 리스트? 어떤 표현이 좋을까?
   - 결국 주어진 vertex가 어떻게 연결되어 있는지가 중요함
   - 이는 edge connectivity가 중요하다는 뜻
@@ -134,11 +134,9 @@ for all v ∈ V:
 ### 3.2.3 Connectivity in undirected graphs
 
 - connected graph
-
   - 어떤 undirected graph가 연결되어 있다는 것은, 어떤 노드들을 잡아도 path가 존재한다는 것
 
 - connected components
-
   - 각각의 component가 subgraph임
     - subgraph란, internally connected & no edges to the remaining nodes
 
@@ -146,30 +144,27 @@ for all v ∈ V:
   → DFS를 통해, 그래프가 연결되어있는지 체크할 수 있음  
   → 하나의 노드에 숫자를 부여해서 포함된 connected component를 식별 가능
 
-- ```
-  procedure previsit(v)
-  ccnum[v] = cc
-  ```
+```python
+procedure previsit(v)
+ccnum[v] = cc
+```
 
-  - cc : 0으로 초기화, DFS 과정에서 explore가 호출될 때마다 +1
+- cc : 0으로 초기화, DFS 과정에서 explore가 호출될 때마다 +1
 
 - previsit / postvisit
-
   - 결국, DFS는 undirected graph의 연결구조를 linear time 내에 찾는 방법이라고 할 수 있음
-
   - 해당 노드를 첫번째로 발견할 경우 previsit
-
   - 마지막으로 떠날 경우 postvisit
 
-  - ```
-    procedure previsit(v)
-    pre[v] = clock
-    clock = clock + 1 
-    
-    procedrue postvisit(v)
-    post[v] = clock
-    clock = clock + 1
-    ```
+```python
+procedure previsit(v)
+pre[v] = clock
+clock = clock + 1 
+
+procedrue postvisit(v)
+post[v] = clock
+clock = clock + 1
+```
 
   - **Property** 어떤 노드 $u$ 와 $v$ 에 대해, 각각의 구간 $[pre(u),post(u)]$ 와 $[pre(u),post(u)]$ 는 서로 distjoint 이거나 포함관계임  
     WHY? stack 구조는 last-in, first-out 으로 동작하므로, 노드 $u$ 가 스택에 있는 동안의 시간흐름을 구간으로 생각가능
