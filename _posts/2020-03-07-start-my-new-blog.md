@@ -1,6 +1,6 @@
 ---
 title: 2020년 3월 블로그를 시작합니다.
-date: 2020-03-07 11:33:00 +0800
+date: 2020-03-07 11:33:00
 categories: [Personal, Diary]
 tags: [Diary]
 seo:

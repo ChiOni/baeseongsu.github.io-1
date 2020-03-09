@@ -1,6 +1,6 @@
 ---
 title: 어떻게 살아야 할까요? (feat. 글또 4기)
-date: 2020-03-07 11:33:00
+date: 2020-03-08 22:33:00
 categories: [Personal, Diary]
 tags: [Diary]
 seo:

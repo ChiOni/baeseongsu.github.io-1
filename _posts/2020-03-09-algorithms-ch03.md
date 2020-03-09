@@ -1,6 +1,6 @@
 ---
 title: '알고리즘 챕터 3장 : Decompositions of graphs'
-date: 2020-03-08 12:14:00 +0800
+date: 2020-03-09 22:14:00
 categories: [Study Note, Algorithms]
 tags: [Algorithms, DFS]
 use_math: true
