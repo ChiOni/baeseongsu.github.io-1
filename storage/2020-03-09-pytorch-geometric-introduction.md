@@ -1,5 +1,5 @@
 ---
-title: 예제를 통해 알아보는 PyTorch Geometric 기본개념c
+title: 예제를 통해 알아보는 PyTorch Geometric 기본개념
 date: 2020-03-09 12:06:00
 categories: [Deep Learning, Tutorial]
 tags: [Deep Learning, Graph Neural Network, PyTorch]
