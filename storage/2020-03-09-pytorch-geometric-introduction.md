@@ -193,10 +193,89 @@ dataset = dataset.shuffle()
 
 <br/>
 
-다음은 
+다음은 **Cora** 데이터셋을 불러오는 예제입니다.  
+**Cora** 데이터셋은주로 semi-supervised graph node classification task를 위한 데이터셋으로 사용됩니다.
 
+```python
+from torch_geometric.datasets import Planetoid
+
+dataset = Planetoid(root='/tmp/Cora', name='Cora')
+>>> Cora()
+
+len(dataset)
+>>> 1
+
+dataset.num_classes
+>>> 7
+
+dataset.num_node_features
+>>> 1433
+```
+
+- `Cora()` : 데이터셋 전체가 하나의 그래프
+- `num_classes` : 클래스 수 (그래프가 아니라 노드임을 알 수 있음)
+- `num_node_features` : 1433개의 노드특성
+
+<br/>
+
+앞에서 봤던 **ENNZYMES** 과 다르게, **Cora** 데이터셋은 조금 다른 속성을 갖고 있습니다.  
+주로 (준지도학습) 노드예측 task에 사용되기 때문에 추가적인 속성이 존재하는 것을 볼 수 있습니다.
+
+```python
+data = dataset[0]
+>>> Data(edge_index=[2, 10556], test_mask=[2708],
+         train_mask=[2708], val_mask=[2708], x=[2708, 1433], y=[2708])
+
+data.is_undirected()
+>>> True
+
+data.train_mask.sum().item()
+>>> 140
+
+data.val_mask.sum().item()
+>>> 500
+
+data.test_mask.sum().item()
+>>> 1000
+```
+
+- `data = dataset[0]` : `slicing` 을 통해 그래프가 아닌 노드 하나를 가져옵니다.
+- `train_mask` : 학습하기 위해 사용하는 노드들을 가리킴
+- `val_mask` : 검증 시 사용하는 노드들을 가리킴
+- `test_mask` : 테스트 시 사용하는 노드들을 가리킴
+
+<br/>
+
+<br/>
+
+<br/>
 
 ## 미니배치
+
+많은 뉴럴 네트워크들이 배치 단위로 학습하듯이, `Pytorch Geometric`도 sparse block diagonal adjacency matrices를 만들어 미니배치를 통해 병렬화처리를 수행합니다. 
+
+기존 `torch`에서는 `torch.utils.data.DataLoader`를 통해 배치 단위로 데이터를 처리했습니다.  
+`torch_geometric` 에서는 `torch_geometric.data.DataLoader`를 통해 그래프 단위 데이터를 처리하게 됩니다.
+
+```pyhton
+from torch_geometric.datasets import TUDataset
+from torch_geometric.data import DataLoader
+
+dataset = TUDataset(root='/tmp/ENZYMES', name='ENZYMES', use_node_attr=True)
+loader = DataLoader(dataset, batch_size=32, shuffle=True)
+
+for batch in loader:
+    batch
+    >>> Batch(batch=[1082], edge_index=[2, 4066], x=[1082, 21], y=[32])
+
+    batch.num_graphs
+    >>> 32
+```
+
+- `DataLoader` : 앞에서 봤던 `torch_geometric.data.Data` 클
+
+
+
 ## 데이터 변환
 
 ## 그래프로 학습하기
