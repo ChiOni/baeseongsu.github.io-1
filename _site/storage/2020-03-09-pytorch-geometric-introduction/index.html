@@ -1,0 +1,573 @@
+<p>다음 글은 <a href="https://github.com/rusty1s/pytorch_geometric">PyTorch Geometric</a> 라이브러리 설명서에 있는  <a href="https://pytorch-geometric.readthedocs.io/en/latest/notes/introduction.html#">Introduction by Example</a> 를 참고하여 작성했습니다.</p>
+
+<p><br /></p>
+
+<p><img src="https://pytorch-geometric.readthedocs.io/en/latest/_static/pyg_logo_text.svg" width="400" height="400" /></p>
+
+<p><br /></p>
+
+<p>최근 Graph Neural Network에 대해 관심이 많아 공부하던 도중  <kbd>PyTorch Geometric</kbd>라는 라이브러리를 알게되었습니다. 실제 코드를 작성해보지 않으면, 평생 사용할 수 없을 것 같아 해당 라이브러리의 Docs를 번역하여 글을 작성했습니다. 여러 예제를 통해 <strong>PyTorch Geometric 라이브러리에서 등장하는 5가지 기본 개념</strong>에 대해 살펴보겠습니다.</p>
+
+<p><br /></p>
+
+<ul id="markdown-toc">
+  <li><a href="#그래프의-데이터-핸들링" id="markdown-toc-그래프의-데이터-핸들링"><strong>그래프의 데이터 핸들링</strong></a></li>
+  <li><a href="#공통-벤치마크-데이터셋" id="markdown-toc-공통-벤치마크-데이터셋"><strong>공통 벤치마크 데이터셋</strong></a></li>
+  <li><a href="#미니배치" id="markdown-toc-미니배치"><strong>미니배치</strong></a></li>
+  <li><a href="#데이터-변환" id="markdown-toc-데이터-변환"><strong>데이터 변환</strong></a></li>
+  <li><a href="#그래프로-학습하기" id="markdown-toc-그래프로-학습하기">그래프로 학습하기</a></li>
+</ul>
+<p><br /></p>
+
+<hr />
+
+<p><br /></p>
+
+<h2 id="그래프의-데이터-핸들링"><strong>그래프의 데이터 핸들링</strong></h2>
+
+<p>그래프는 단순히 노드(node 또는 vertex)와 그 노드를 연결하는 간선(edge)을 하나로 모아 놓은 자료 구조 입니다. 그래프를 구성하는 노드와 엣지들을 모아놓은 집합을 각각 $V, E$ 라고 했을 때, 그래프는 $G=(V,E)$ 로 표현할 수 있습니다.</p>
+
+<p>PyTorch Geometric 에서 하나의 그래프는 <code class="highlighter-rouge">torch_geometric.data.Data</code> 라는 인스턴스로 표현됩니다.<br />
+특히, 이 인스턴스는 다음과 같은 default 속성을 갖고 있습니다.</p>
+
+<p><br /></p>
+
+<ul>
+  <li><code class="highlighter-rouge">data.x</code> : 노드특징 행렬
+    <ul>
+      <li>[num_nodes, num_node_features]</li>
+    </ul>
+  </li>
+  <li><code class="highlighter-rouge">data.edge_index</code> : 그래프의 연결성
+    <ul>
+      <li>[2, num_edges]</li>
+    </ul>
+  </li>
+  <li><code class="highlighter-rouge">data.edge_attr</code> : 엣지특징 행렬
+    <ul>
+      <li>[num_edges, num_edge_features]</li>
+    </ul>
+  </li>
+  <li><code class="highlighter-rouge">data.y</code> : 학습하고 싶은 대상 (타겟)
+    <ul>
+      <li>그래프 레벨 → [num_nodes, *]</li>
+      <li>노드 레벨 → [1, *]</li>
+    </ul>
+  </li>
+  <li><code class="highlighter-rouge">data.pos</code> : 노드위치 행렬
+    <ul>
+      <li>[num_nodes, num_dimensions]</li>
+    </ul>
+  </li>
+</ul>
+
+<p><br /></p>
+
+<p>사실 위에 있는 속성들은 필수가 아니라 <strong>옵션</strong>입니다. 즉, 자신이 구성하고 싶은 속성들을 다양하게 모델링할 수 있습니다. 하지만 일반적으로 그래프 데이터는 노드와 엣지로 표현하기 때문에 위의 속성들로 표현하는 것이 적합해 보입니다.</p>
+
+<p>기존의 <code class="highlighter-rouge">torchvision</code>은 이미지와 타겟으로 구성된 튜플 형태로 데이터를 정의했습니다.<br />
+그와 다르게,  <code class="highlighter-rouge">PyTorch Geometric</code>은 조금 더 그래프에 직관적인 형태의 데이터 구조를 갖고 있습니다.</p>
+
+<p><br /></p>
+
+<p>그럼 Data 클래스를 사용해 그래프 인스턴스를 만들어보겠습니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="rouge-code"><pre><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch_geometric.data</span> <span class="kn">import</span> <span class="n">Data</span>
+
+<span class="n">edge_index</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
+                        <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="nb">long</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(([</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="nb">float</span><span class="p">))</span>
+
+<span class="n">data</span> <span class="o">=</span> <span class="n">Data</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">edge_index</span><span class="o">=</span><span class="n">edge_index</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">Data</span><span class="p">(</span><span class="n">edge_index</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+<ul>
+  <li><code class="highlighter-rouge">edge_index</code> : (2,4) 크기의 행렬 → 4개의 엣지조합</li>
+  <li><code class="highlighter-rouge">x</code> : (3,1) 크기의 행렬 → 3개의 노드와 각 노드의 특징은 1개</li>
+</ul>
+
+<p><br /></p>
+
+<p>일반적으로 엣지는 노드의 순서쌍으로 나타내는 경우가 많습니다.<br />
+따라서 (v1, v2) 와 같은 자료형 구조가 익숙할 때가 많습니다.<br />
+이런 경우, <code class="highlighter-rouge">contiguous()</code> 를 사용해 동일한 그래프로 표현할 수 있습니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="rouge-code"><pre><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch_geometric.data</span> <span class="kn">import</span> <span class="n">Data</span>
+
+<span class="n">edge_index</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+                        <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+                        <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
+                        <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="nb">long</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="nb">float</span><span class="p">)</span>
+
+<span class="n">data</span> <span class="o">=</span> <span class="n">Data</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">edge_index</span><span class="o">=</span><span class="n">edge_index</span><span class="o">.</span><span class="n">t</span><span class="p">()</span><span class="o">.</span><span class="n">contiguous</span><span class="p">())</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">Data</span><span class="p">(</span><span class="n">edge_index</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<p><br /></p>
+
+<figure>
+  <img src="https://pytorch-geometric.readthedocs.io/en/latest/_images/graph.svg" width="400" height="400" />
+    <figcaption><center>우리가 정의한 data 인스턴스의 실제 그래프</center></figcaption>
+</figure>
+
+<p><br /></p>
+
+<p><br /></p>
+
+<p><br /></p>
+
+<p>추가적으로, <code class="highlighter-rouge">torch_geometric.data.Data</code> 클래스는 다음과 같은 함수를 제공합니다.</p>
+
+<ul>
+  <li><code class="highlighter-rouge">data.keys</code> : 해당 속성 이름</li>
+  <li><code class="highlighter-rouge">data.num_nodes</code> : 노드 총 개수</li>
+  <li><code class="highlighter-rouge">data.num_edges</code> : 엣지 총 개수</li>
+  <li><code class="highlighter-rouge">data.contains_isolated_nodes()</code> : 고립 노드 여부 확인</li>
+  <li><code class="highlighter-rouge">data.contains_self_loops()</code> : 셀프 루프 포함 여부 확인</li>
+  <li><code class="highlighter-rouge">data.is_directed()</code> : 그래프의 방향성 여부 확인</li>
+</ul>
+
+<p><br /></p>
+
+<p>그래프론에서 자주 사용하는 루프, 고립된 노드, 방향성 등 그래프 특징을 반영한 함수들이 있네요.<br />
+소스코드를 뜯어보면, 어떤 알고리즘을 사용했는지까지 알 수 있다는 생각이 듭니다.</p>
+
+<p><br /></p>
+
+<p><br /></p>
+
+<p><br /></p>
+
+<h2 id="공통-벤치마크-데이터셋"><strong>공통 벤치마크 데이터셋</strong></h2>
+
+<p>PyTorch Geometric은 <strong>다양한 공통 벤치마크 데이터셋</strong>을 포함하고 있습니다.<br />
+해당 데이터셋의 종류는 <a href="https://pytorch-geometric.readthedocs.io/en/latest/modules/datasets.html">torch_geometric.datasets</a> 에서 확인할 수 있습니다.</p>
+
+<p>각 데이터셋마다 그래프 데이터의 속성이 다르기 때문에 사용되는 함수가 다를 수 있습니다.<br />
+그래프하면 빠질 수 없는 데이터셋인, <strong>ENZYMES</strong> 과 <strong>Cora</strong> 에 대한 예시를 살펴보겠습니다.</p>
+
+<p><br /></p>
+
+<p>다음은 <strong>ENZYMES</strong> 데이터셋을 불러오는 예제입니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="rouge-code"><pre><span class="kn">from</span> <span class="nn">torch_geometric.datasets</span> <span class="kn">import</span> <span class="n">TUDataset</span>
+
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">TUDataset</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="s">'/tmp/ENZYMES'</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s">'ENZYMES'</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">ENZYMES</span><span class="p">(</span><span class="mi">600</span><span class="p">)</span>
+
+<span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="mi">600</span>
+
+<span class="n">dataset</span><span class="o">.</span><span class="n">num_classes</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="mi">6</span>
+
+<span class="n">dataset</span><span class="o">.</span><span class="n">num_node_features</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="mi">3</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<ul>
+  <li><code class="highlighter-rouge">num_classes</code> : 그래프의 클래스 수</li>
+  <li><code class="highlighter-rouge">num_node_features</code> : 노드의 특징 수</li>
+</ul>
+
+<p><br /></p>
+
+<p>ENZYMES 데이터셋에는 6종류의 클래스를 가진 600개의 그래프가 있는 것을 확인할 수 있습니다.<br />
+그래프 하나를 가져올 때는 어떻게 할까요?</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="rouge-code"><pre><span class="n">data</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">Data</span><span class="p">(</span><span class="n">edge_index</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">168</span><span class="p">],</span> <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="mi">37</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+<span class="n">data</span><span class="o">.</span><span class="n">is_undirected</span><span class="p">()</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="bp">True</span>
+
+<span class="n">train_dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[:</span><span class="mi">540</span><span class="p">]</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">ENZYMES</span><span class="p">(</span><span class="mi">540</span><span class="p">)</span>
+
+<span class="n">test_dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span><span class="mi">540</span><span class="p">:]</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">ENZYMES</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span>
+
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">shuffle</span><span class="p">()</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">ENZYMES</span><span class="p">(</span><span class="mi">600</span><span class="p">)</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<ul>
+  <li><code class="highlighter-rouge">슬라이싱</code>을 통해 하나의 그래프 데이터를 가져올 수 있습니다.</li>
+  <li><code class="highlighter-rouge">edge_index=[2, 168]</code> → 총 84개의 엣지</li>
+  <li><code class="highlighter-rouge">x=[37, 3]</code> → 총 37개의 노드와 3개의 노드특성</li>
+  <li><code class="highlighter-rouge">y=[1]</code> → 그래프 레벨 타겟</li>
+  <li><code class="highlighter-rouge">dataset.shuffle()</code> → 데이터셋 셔플</li>
+</ul>
+
+<p><br /></p>
+
+<p>다음은 <strong>Cora</strong> 데이터셋을 불러오는 예제입니다.<br />
+<strong>Cora</strong> 데이터셋은주로 semi-supervised graph node classification task를 위한 데이터셋으로 사용됩니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="rouge-code"><pre><span class="kn">from</span> <span class="nn">torch_geometric.datasets</span> <span class="kn">import</span> <span class="n">Planetoid</span>
+
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">Planetoid</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="s">'/tmp/Cora'</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s">'Cora'</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">Cora</span><span class="p">()</span>
+
+<span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="mi">1</span>
+
+<span class="n">dataset</span><span class="o">.</span><span class="n">num_classes</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="mi">7</span>
+
+<span class="n">dataset</span><span class="o">.</span><span class="n">num_node_features</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="mi">1433</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<ul>
+  <li><code class="highlighter-rouge">Cora()</code> : 데이터셋 전체가 하나의 그래프</li>
+  <li><code class="highlighter-rouge">num_classes</code> : 클래스 수 (그래프가 아니라 노드임을 알 수 있음)</li>
+  <li><code class="highlighter-rouge">num_node_features</code> : 1433개의 노드특성</li>
+</ul>
+
+<p><br /></p>
+
+<p>앞에서 봤던 <strong>ENNZYMES</strong> 과 다르게, <strong>Cora</strong> 데이터셋은 조금 다른 속성을 갖고 있습니다.<br />
+주로 (준지도학습) 노드예측 task에 사용되기 때문에 추가적인 속성이 존재하는 것을 볼 수 있습니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="rouge-code"><pre><span class="n">data</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">Data</span><span class="p">(</span><span class="n">edge_index</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">10556</span><span class="p">],</span> <span class="n">test_mask</span><span class="o">=</span><span class="p">[</span><span class="mi">2708</span><span class="p">],</span>
+         <span class="n">train_mask</span><span class="o">=</span><span class="p">[</span><span class="mi">2708</span><span class="p">],</span> <span class="n">val_mask</span><span class="o">=</span><span class="p">[</span><span class="mi">2708</span><span class="p">],</span> <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="mi">2708</span><span class="p">,</span> <span class="mi">1433</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="mi">2708</span><span class="p">])</span>
+
+<span class="n">data</span><span class="o">.</span><span class="n">is_undirected</span><span class="p">()</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="bp">True</span>
+
+<span class="n">data</span><span class="o">.</span><span class="n">train_mask</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="mi">140</span>
+
+<span class="n">data</span><span class="o">.</span><span class="n">val_mask</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="mi">500</span>
+
+<span class="n">data</span><span class="o">.</span><span class="n">test_mask</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="mi">1000</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<ul>
+  <li><code class="highlighter-rouge">data = dataset[0]</code> : <code class="highlighter-rouge">slicing</code> 을 통해 그래프가 아닌 노드 하나를 가져옵니다.</li>
+  <li><code class="highlighter-rouge">train_mask</code> : 학습하기 위해 사용하는 노드들을 가리킴</li>
+  <li><code class="highlighter-rouge">val_mask</code> : 검증 시 사용하는 노드들을 가리킴</li>
+  <li><code class="highlighter-rouge">test_mask</code> : 테스트 시 사용하는 노드들을 가리킴</li>
+</ul>
+
+<p><br /></p>
+
+<p><br /></p>
+
+<p><br /></p>
+
+<h2 id="미니배치"><strong>미니배치</strong></h2>
+
+<p>많은 뉴럴 네트워크들이 배치 단위로 학습하듯이, <strong>Pytorch Geometric</strong>도 sparse block diagonal adjacency matrices를 만들어 미니배치를 통해 병렬화처리를 수행합니다.</p>
+
+<p>기존 <code class="highlighter-rouge">torch</code>에서는 <code class="highlighter-rouge">torch.utils.data.DataLoader</code>를 통해 배치 단위로 데이터를 처리했습니다.<br />
+<code class="highlighter-rouge">torch_geometric</code> 에서는 <code class="highlighter-rouge">torch_geometric.data.DataLoader</code>를 통해 그래프 단위 데이터를 처리하게 됩니다.</p>
+
+<pre><code class="language-pyhton">from torch_geometric.datasets import TUDataset
+from torch_geometric.data import DataLoader
+
+dataset = TUDataset(root='/tmp/ENZYMES', name='ENZYMES', use_node_attr=True)
+loader = DataLoader(dataset, batch_size=32, shuffle=True)
+
+for batch in loader:
+    batch
+    &gt;&gt;&gt; Batch(batch=[1082], edge_index=[2, 4066], x=[1082, 21], y=[32])
+
+    batch.num_graphs
+    &gt;&gt;&gt; 32
+</code></pre>
+
+<ul>
+  <li><code class="highlighter-rouge">DataLoader</code> : 앞에서 봤던 <code class="highlighter-rouge">torch_geometric.data.Data</code> 클</li>
+</ul>
+
+<h2 id="데이터-변환"><strong>데이터 변환</strong></h2>
+
+<p>역시, 데이터를 전처리하기 위해 사용하는 함수도 있습니다. 우리가 잘 아는 <code class="highlighter-rouge">torchvision</code>에서는 <code class="highlighter-rouge">torchvision.transforms.Compose</code>를 통해 여러 이미지 전처리 함수들을 결합해 사용합니다.</p>
+
+<p>이와 비슷하게 Pytorch Gemotric도 <code class="highlighter-rouge">Data</code> 객체를 `</p>
+
+<p>다음은 ShapeNet dataset를 활용해 transforms을 적용한 예제입니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+</pre></td><td class="rouge-code"><pre><span class="kn">from</span> <span class="nn">torch_geometric.datasets</span> <span class="kn">import</span> <span class="n">ShapeNet</span>
+
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">ShapeNet</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="s">'/tmp/ShapeNet'</span><span class="p">,</span> <span class="n">categories</span><span class="o">=</span><span class="p">[</span><span class="s">'Airplane'</span><span class="p">])</span>
+
+<span class="n">dataset</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">Data</span><span class="p">(</span><span class="n">pos</span><span class="o">=</span><span class="p">[</span><span class="mi">2518</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="mi">2518</span><span class="p">])</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<ul>
+  <li>ShapeNet은 17000건의 3D형태의 점구름(point clouds) 데이터입니다. 총 16개의 카테고리로 구성되어 있습니다.</li>
+  <li><code class="highlighter-rouge">pos=[2518, 3]</code> : 2518개의 점데이터와 3차원임을 나타냅니다.</li>
+</ul>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="rouge-code"><pre><span class="kn">import</span> <span class="nn">torch_geometric.transforms</span> <span class="k">as</span> <span class="n">T</span>
+<span class="kn">from</span> <span class="nn">torch_geometric.datasets</span> <span class="kn">import</span> <span class="n">ShapeNet</span>
+
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">ShapeNet</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="s">'/tmp/ShapeNet'</span><span class="p">,</span> <span class="n">categories</span><span class="o">=</span><span class="p">[</span><span class="s">'Airplane'</span><span class="p">],</span>
+                    <span class="n">pre_transform</span><span class="o">=</span><span class="n">T</span><span class="o">.</span><span class="n">KNNGraph</span><span class="p">(</span><span class="n">k</span><span class="o">=</span><span class="mi">6</span><span class="p">),</span>
+                    <span class="n">transform</span><span class="o">=</span><span class="n">T</span><span class="o">.</span><span class="n">RandomTranslate</span><span class="p">(</span><span class="mf">0.01</span><span class="p">))</span>
+
+<span class="n">dataset</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">Data</span><span class="p">(</span><span class="n">edge_index</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">15108</span><span class="p">],</span> <span class="n">pos</span><span class="o">=</span><span class="p">[</span><span class="mi">2518</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="mi">2518</span><span class="p">])</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<ul>
+  <li><code class="highlighter-rouge">pre_transform = T.KNNGraph(k=6)</code> : KNN을 통해 데이터를 그래프 형태로 변형합니다.
+    <ul>
+      <li>결과값으로 <code class="highlighter-rouge">edge_index</code>가 추가된 것을 확인할 수 있습니다. (즉, 연결상태 생성)</li>
+    </ul>
+  </li>
+  <li><code class="highlighter-rouge">transform = T.RandomTranslate(0.01)</code> : 각 노드의 위치를</li>
+</ul>
+
+<h2 id="그래프로-학습하기">그래프로 학습하기</h2>
+
+<p>앞에서 다음과 같은 내용을 배웠습니다.</p>
+
+<ul>
+  <li>그래프 데이터 핸들링하기</li>
+  <li><code class="highlighter-rouge">dataset</code>, <code class="highlighter-rouge">dataloader</code> 인스턴스 생성하기</li>
+  <li><code class="highlighter-rouge">transforms</code> 를 사용해 데이터를 변환하기</li>
+</ul>
+
+<p>이제 Graph Neural Network을 활용해 분류 문제를 해결해보겠습니다.<br />
+다음은 간단한 <strong>GCN layer</strong>를 구성한 뒤,  <strong>Cora</strong> 데이터셋에 적용하는 예제입니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+</pre></td><td class="rouge-code"><pre><span class="kn">from</span> <span class="nn">torch_geometric.datasets</span> <span class="kn">import</span> <span class="n">Planetoid</span>
+
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">Planetoid</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="s">'/tmp/Cora'</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s">'Cora'</span><span class="p">)</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">Cora</span><span class="p">()</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<ul>
+  <li>Cora 데이터셋은 2708개의 “scientific publications”으로 구성된 데이터입니다.</li>
+  <li>하나의 논문은 여러 논문들을 인용할 수 있는데, 이를 연결한 네트워크가 바로 citation network 입니다.</li>
+  <li>citation network을 하나의 그래프로 본다면, 각 논문은 노드로 볼 수 있고 인용 관계가는 엣지가 됩니다.</li>
+  <li>또한, 논문에서 등장하는 1433개의 특정단어들을 모아 하나의 단어사전으로 만들고, 각 논문마다 단어의 등장 여부를 feature vector로 만들어줌으로써 노드의 특징을 반영할 수 있게 됩니다.</li>
+</ul>
+
+<p>2개의 <code class="highlighter-rouge">GCNConv</code> layer를 사용합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+</pre></td><td class="rouge-code"><pre><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="n">F</span>
+<span class="kn">from</span> <span class="nn">torch_geometric.nn</span> <span class="kn">import</span> <span class="n">GCNConv</span>
+
+<span class="k">class</span> <span class="nc">Net</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Net</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv1</span> <span class="o">=</span> <span class="n">GCNConv</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">num_node_features</span><span class="p">,</span> <span class="mi">16</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv2</span> <span class="o">=</span> <span class="n">GCNConv</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">num_classes</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">edge_index</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">edge_index</span>
+
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv1</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">edge_index</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">dropout</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">training</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">training</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv2</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">edge_index</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">F</span><span class="o">.</span><span class="n">log_softmax</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<p>아래 과정부터는 기존 <code class="highlighter-rouge">pytorch</code>와 상당히 유사합니다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="rouge-code"><pre><span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s">'cuda'</span> <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="k">else</span> <span class="s">'cpu'</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">Net</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="mf">5e-4</span><span class="p">)</span>
+
+<span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">200</span><span class="p">):</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">nll_loss</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">train_mask</span><span class="p">],</span> <span class="n">data</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">train_mask</span><span class="p">])</span>
+    <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<ul>
+  <li>이미 정의되어 있는 <code class="highlighter-rouge">train_mask</code> 를 사용해 학습 데이터를 구분합니다.</li>
+  <li><code class="highlighter-rouge">dataloader</code> 를 정의할 때, <code class="highlighter-rouge">train_mask</code> 를 사용해서 구현할 수도 있습니다.</li>
+</ul>
+
+<p><br /></p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+</pre></td><td class="rouge-code"><pre><span class="n">model</span><span class="o">.</span><span class="nb">eval</span><span class="p">()</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">pred</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">.</span><span class="nb">max</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">correct</span> <span class="o">=</span> <span class="nb">float</span> <span class="p">(</span><span class="n">pred</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">test_mask</span><span class="p">]</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">test_mask</span><span class="p">])</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
+<span class="n">acc</span> <span class="o">=</span> <span class="n">correct</span> <span class="o">/</span> <span class="n">data</span><span class="o">.</span><span class="n">test_mask</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'Accuracy: {:.4f}'</span><span class="o">.</span><span class="nb">format</span><span class="p">(</span><span class="n">acc</span><span class="p">))</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">Accuracy</span><span class="p">:</span> <span class="mf">0.8150</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<ul>
+  <li>마찬가지로, <code class="highlighter-rouge">test_mask</code> 를 사용해 평가 데이터를 구분합니다.</li>
+</ul>
+
+<p><br /></p>
+
+<hr />
+
+<p><br /></p>
+
+<p>GNN에 대한 연구는 꽤 진척이 있는 상태고, 다양한 분야에도 적용한 사례들이 많습니다.<br />
+예전에 간단한 GCN 구조를 <code class="highlighter-rouge">pytorch</code> 로 구현하면서, 힘들었던 기억이 있었는데요.<br />
+<code class="highlighter-rouge">torch_geometric</code> 을 사용한다면, 확실히 좀 더 쉽지 않을까 생각됩니다.</p>
+
+<p>제가 생각한  <code class="highlighter-rouge">torch geometric</code> 의 강점은 크게 2가지 입니다.</p>
+
+<ol>
+  <li><code class="highlighter-rouge">torch_geometric.nn</code> 을 통해 다양한 레이어들을 구성할 수 있다.
+    <ul>
+      <li>크게는 Convoluional Layer와 Pooling Layer로 구성</li>
+      <li>최신 GNN 논문들이 빠르게 반영됨</li>
+    </ul>
+  </li>
+  <li><code class="highlighter-rouge">torch_geometric.datasets</code> 을 통해 다양한 벤치마크 데이터셋을 쉽게 이용할 수 있다.
+    <ul>
+      <li>각 그래프 데이터셋마다 특징이 다른 것을 잘 구현함</li>
+      <li>이는 <code class="highlighter-rouge">torch_geometric.data</code> 와 연관되어 있어 그래프 데이터를 빠르게 살펴볼 수 있음</li>
+    </ul>
+  </li>
+</ol>
+

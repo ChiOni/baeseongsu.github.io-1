@@ -81,6 +81,7 @@ data = Data(x=x, edge_index=edge_index)
 <br/>
 
 일반적으로 엣지는 노드의 순서쌍으로 나타내는 경우가 많습니다.  
+따라서 (v1, v2) 와 같은 자료형 구조가 익숙할 때가 많습니다.  
 이런 경우, `contiguous()` 를 사용해 동일한 그래프로 표현할 수 있습니다. 
 
 ```python
@@ -250,9 +251,9 @@ data.test_mask.sum().item()
 
 <br/>
 
-## 미니배치
+## **미니배치**
 
-많은 뉴럴 네트워크들이 배치 단위로 학습하듯이, `Pytorch Geometric`도 sparse block diagonal adjacency matrices를 만들어 미니배치를 통해 병렬화처리를 수행합니다. 
+많은 뉴럴 네트워크들이 배치 단위로 학습하듯이, **Pytorch Geometric**도 sparse block diagonal adjacency matrices를 만들어 미니배치를 통해 병렬화처리를 수행합니다. 
 
 기존 `torch`에서는 `torch.utils.data.DataLoader`를 통해 배치 단위로 데이터를 처리했습니다.  
 `torch_geometric` 에서는 `torch_geometric.data.DataLoader`를 통해 그래프 단위 데이터를 처리하게 됩니다.
@@ -276,9 +277,163 @@ for batch in loader:
 
 
 
-## 데이터 변환
+## **데이터 변환**
+
+역시, 데이터를 전처리하기 위해 사용하는 함수도 있습니다. 우리가 잘 아는 `torchvision`에서는 `torchvision.transforms.Compose`를 통해 여러 이미지 전처리 함수들을 결합해 사용합니다.
+
+이와 비슷하게 Pytorch Gemotric도 `Data` 객체를 `
+
+
+
+다음은 ShapeNet dataset를 활용해 transforms을 적용한 예제입니다.
+
+```python
+from torch_geometric.datasets import ShapeNet
+
+dataset = ShapeNet(root='/tmp/ShapeNet', categories=['Airplane'])
+
+dataset[0]
+>>> Data(pos=[2518, 3], y=[2518])
+```
+
+- ShapeNet은 17000건의 3D형태의 점구름(point clouds) 데이터입니다. 총 16개의 카테고리로 구성되어 있습니다.
+- `pos=[2518, 3]` : 2518개의 점데이터와 3차원임을 나타냅니다.
+
+
+
+```python
+import torch_geometric.transforms as T
+from torch_geometric.datasets import ShapeNet
+
+dataset = ShapeNet(root='/tmp/ShapeNet', categories=['Airplane'],
+                    pre_transform=T.KNNGraph(k=6),
+                    transform=T.RandomTranslate(0.01))
+
+dataset[0]
+>>> Data(edge_index=[2, 15108], pos=[2518, 3], y=[2518])
+```
+
+- `pre_transform = T.KNNGraph(k=6)` : KNN을 통해 데이터를 그래프 형태로 변형합니다.
+  - 결과값으로 `edge_index`가 추가된 것을 확인할 수 있습니다. (즉, 연결상태 생성)
+- `transform = T.RandomTranslate(0.01)` : 각 노드의 위치를 
+
+
+
+
+
+
 
 ## 그래프로 학습하기
+
+앞에서 다음과 같은 내용을 배웠습니다.
+
+- 그래프 데이터 핸들링하기
+- `dataset`, `dataloader` 인스턴스 생성하기
+- `transforms` 를 사용해 데이터를 변환하기
+
+
+
+이제 Graph Neural Network을 활용해 분류 문제를 해결해보겠습니다.  
+다음은 간단한 **GCN layer**를 구성한 뒤,  **Cora** 데이터셋에 적용하는 예제입니다.
+
+```python
+from torch_geometric.datasets import Planetoid
+
+dataset = Planetoid(root='/tmp/Cora', name='Cora')
+>>> Cora()
+```
+
+- Cora 데이터셋은 2708개의 "scientific publications"으로 구성된 데이터입니다.
+- 하나의 논문은 여러 논문들을 인용할 수 있는데, 이를 연결한 네트워크가 바로 citation network 입니다.
+- citation network을 하나의 그래프로 본다면, 각 논문은 노드로 볼 수 있고 인용 관계가는 엣지가 됩니다.
+- 또한, 논문에서 등장하는 1433개의 특정단어들을 모아 하나의 단어사전으로 만들고, 각 논문마다 단어의 등장 여부를 feature vector로 만들어줌으로써 노드의 특징을 반영할 수 있게 됩니다.
+
+
+
+2개의 `GCNConv` layer를 사용합니다. 
+
+```python
+import torch
+import torch.nn.functional as F
+from torch_geometric.nn import GCNConv
+
+class Net(torch.nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        self.conv1 = GCNConv(dataset.num_node_features, 16)
+        self.conv2 = GCNConv(16, dataset.num_classes)
+
+    def forward(self, data):
+        x, edge_index = data.x, data.edge_index
+
+        x = self.conv1(x, edge_index)
+        x = F.relu(x)
+        x = F.dropout(x, training=self.training)
+        x = self.conv2(x, edge_index)
+
+        return F.log_softmax(x, dim=1)
+```
+
+
+
+아래 과정부터는 기존 `pytorch`와 상당히 유사합니다.
+
+```python
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = Net().to(device)
+data = dataset[0].to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+
+model.train()
+for epoch in range(200):
+    optimizer.zero_grad()
+    out = model(data)
+    loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
+    loss.backward()
+    optimizer.step()
+```
+
+- 이미 정의되어 있는 `train_mask` 를 사용해 학습 데이터를 구분합니다.
+- `dataloader` 를 정의할 때, `train_mask` 를 사용해서 구현할 수도 있습니다.
+
+<br/>
+
+```python
+model.eval()
+_, pred = model(data).max(dim=1)
+correct = float (pred[data.test_mask].eq(data.y[data.test_mask]).sum().item())
+acc = correct / data.test_mask.sum().item()
+print('Accuracy: {:.4f}'.format(acc))
+>>> Accuracy: 0.8150
+```
+
+- 마찬가지로, `test_mask` 를 사용해 평가 데이터를 구분합니다.
+
+<br/>
+
+---
+
+<br/>
+
+GNN에 대한 연구는 꽤 진척이 있는 상태고, 다양한 분야에도 적용한 사례들이 많습니다.  
+예전에 간단한 GCN 구조를 `pytorch` 로 구현하면서, 힘들었던 기억이 있었는데요.  
+`torch_geometric` 을 사용한다면, 확실히 좀 더 쉽지 않을까 생각됩니다.
+
+
+
+제가 생각한  `torch geometric` 의 강점은 크게 2가지 입니다.
+
+1. `torch_geometric.nn` 을 통해 다양한 레이어들을 구성할 수 있다.
+   - 크게는 Convoluional Layer와 Pooling Layer로 구성
+   - 최신 GNN 논문들이 빠르게 반영됨
+2. `torch_geometric.datasets` 을 통해 다양한 벤치마크 데이터셋을 쉽게 이용할 수 있다.
+   - 각 그래프 데이터셋마다 특징이 다른 것을 잘 구현함
+   - 이는 `torch_geometric.data` 와 연관되어 있어 그래프 데이터를 빠르게 살펴볼 수 있음
+
+
+
+
+
 
 
 

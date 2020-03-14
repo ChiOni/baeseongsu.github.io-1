@@ -18,6 +18,36 @@ MathJax.Hub.Register.MessageHook("TeX Jax - parse error",function (message) {
 	  alert("Math Processing Error: "+message[1]);
 	});
 </script>
+
+
+<script type="text/javascript"
+    src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+<!--
 <script type="text/javascript" async
   src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
 </script>
+-->
+
+<!--
+충돌시 문제해결https://11011110.github.io/blog/2019/10/17/mathjax-3-jekyll.html
+<script type="text/javascript">
+document.addEventListener('DOMContentLoaded', function(){
+  function stripcdata(x) {
+    if (x.startsWith('% <![CDATA[') && x.endsWith('%]]>'))
+      return x.substring(11,x.length-4);
+    return x;
+  }
+  document.querySelectorAll("script[type='math/tex']").forEach(function(el){
+    el.outerHTML = "\\(" + stripcdata(el.textContent) + "\\)";
+  });
+  document.querySelectorAll("script[type='math/tex; mode=display']").forEach(function(el){
+    el.outerHTML = "$$" + stripcdata(el.textContent) + "$$";
+  });
+  var script = document.createElement('script');
+  script.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js";
+  document.head.appendChild(script);
+}, false);
+</script>
+-->
